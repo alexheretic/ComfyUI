@@ -30,6 +30,7 @@ from torch.nn.functional import interpolate
 from tqdm.auto import trange
 from einops import rearrange
 from comfy.cli_args import args, enables_dynamic_vram
+from tqdm import tqdm
 import json
 import time
 import mmap
@@ -1101,7 +1102,7 @@ def tiled_scale_multidim(samples, function, tile=(64, 64), overlap=8, upscale_am
 
     output = torch.empty([samples.shape[0], out_channels] + mult_list_upscale(samples.shape[2:]), device=output_device)
 
-    for b in range(samples.shape[0]):
+    for b in tqdm(range(samples.shape[0]), desc="tiled_scale", disable=samples.shape[0] <= 1):
         s = samples[b:b+1]
 
         # handle entire input fitting in a single tile
