@@ -42,7 +42,7 @@ class WanImageToVideo(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, positive, negative, vae, width, height, length, batch_size, vae_tile_size=0, start_image=None, clip_vision_output=None, ref_pad_image=None) -> io.NodeOutput:
+    def execute(cls, positive, negative, vae, width, height, length, batch_size, start_image=None, clip_vision_output=None, ref_pad_image=None, vae_tile_size=0) -> io.NodeOutput:
         latent = torch.zeros([batch_size, 16, ((length - 1) // 4) + 1, height // 8, width // 8], device=comfy.model_management.intermediate_device())
         if start_image is not None:
             start_image = comfy.utils.common_upscale(start_image[:length].movedim(-1, 1), width, height, "bilinear", "center").movedim(1, -1)
@@ -55,7 +55,7 @@ class WanImageToVideo(io.ComfyNode):
             if vae_tile_size == 0:
                 concat_latent_image = vae.encode(image[:, :, :, :3])
             else:
-                concat_latent_image = vae.encode_tiled(image[:, :, :, :3], tile_x=vae_tile_size, tile_y=vae_tile_size, overlap=32, tile_t=256, overlap_t=8)
+                concat_latent_image = vae.encode_tiled(image[:, :, :, :3], tile_x=vae_tile_size, tile_y=vae_tile_size, overlap=min(32, vae_tile_size // 2), tile_t=256, overlap_t=8)
 
             mask = torch.ones((1, 1, latent.shape[2], concat_latent_image.shape[-2], concat_latent_image.shape[-1]), device=start_image.device, dtype=start_image.dtype)
             mask[:, :, :((start_image.shape[0] - 1) // 4) + 1] = 0.0
@@ -218,7 +218,7 @@ class WanFirstLastFrameToVideo(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, positive, negative, vae, width, height, length, batch_size, vae_tile_size=0, start_image=None, end_image=None, clip_vision_start_image=None, clip_vision_end_image=None) -> io.NodeOutput:
+    def execute(cls, positive, negative, vae, width, height, length, batch_size, start_image=None, end_image=None, clip_vision_start_image=None, clip_vision_end_image=None, vae_tile_size=0) -> io.NodeOutput:
         spacial_scale = vae.spacial_compression_encode()
         latent = torch.zeros([batch_size, vae.latent_channels, ((length - 1) // 4) + 1, height // spacial_scale, width // spacial_scale], device=comfy.model_management.intermediate_device())
         if start_image is not None:
@@ -240,7 +240,7 @@ class WanFirstLastFrameToVideo(io.ComfyNode):
         if vae_tile_size == 0:
             concat_latent_image = vae.encode(image[:, :, :, :3])
         else:
-            concat_latent_image = vae.encode_tiled(image[:, :, :, :3], tile_x=vae_tile_size, tile_y=vae_tile_size, overlap=32, tile_t=256, overlap_t=8)
+            concat_latent_image = vae.encode_tiled(image[:, :, :, :3], tile_x=vae_tile_size, tile_y=vae_tile_size, overlap=min(32, vae_tile_size // 2), tile_t=256, overlap_t=8)
 
         mask = mask.view(1, mask.shape[2] // 4, 4, mask.shape[3], mask.shape[4]).transpose(1, 2)
         positive = node_helpers.conditioning_set_values(positive, {"concat_latent_image": concat_latent_image, "concat_mask": mask})
